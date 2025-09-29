@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.all_check import all_check
 from src.web.helpers import get_config
 
 
@@ -26,11 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Инициализация сервисов
-# config = get_config() todo
-# indexing_service = IndexingService()
-# query_service = QueryService()
-
 # Настройка статических файлов и шаблонов
 static_dir = Path(__file__).parent / "static"
 templates_dir = Path(__file__).parent / "templates"
@@ -43,6 +39,17 @@ if templates_dir.exists():
 else:
     templates = None
 
+
+@app.get("/health")
+async def health_check():
+    """Проверка состояния системы."""
+
+    checks = all_check()
+
+    return {
+        "status": "healthy" if checks.pop("healthy") else "unhealthy",
+        **checks,
+    }
 
 if __name__ == "__main__":
     config = get_config()
