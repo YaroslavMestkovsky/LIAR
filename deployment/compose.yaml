@@ -8,7 +8,8 @@ services:
       dockerfile: ./Dockerfile
     container_name: python-ssh
     volumes:
-      - ../app:/app
+      - ../src:/src
+      - ../configs:/configs
       - ./start.sh:/start.sh
     privileged: true
     networks:

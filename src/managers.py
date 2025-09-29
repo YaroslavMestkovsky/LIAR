@@ -26,7 +26,7 @@ class QdrantConfig:
 class QdrantManager:
     """Менеджер для работы с Qdrant."""
 
-    def __init__(self, config_path: str = "/app/configs/quadrant.yaml") -> None:
+    def __init__(self, config_path: str = "./configs/quadrant.yaml") -> None:
         self.base_config: BaseConfig
         self.qdrant_config: QdrantConfig
         self.client: QdrantClient

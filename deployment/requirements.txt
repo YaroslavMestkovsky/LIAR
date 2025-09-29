@@ -1,3 +1,5 @@
 requests
 qdrant-client
 pyyaml
+fastapi
+uvicorn
