@@ -2,13 +2,16 @@ import uvicorn
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.all_check import all_check
 from src.web.helpers import get_config
+
+
+config = get_config()
 
 
 # Инициализация FastAPI
@@ -51,9 +54,40 @@ async def health_check():
         **checks,
     }
 
-if __name__ == "__main__":
-    config = get_config()
 
+@app.post("/upload")
+async def upload_doc(file: UploadFile = File(...)):
+    """Загрузка и индексация файла."""
+
+    try:
+        # Создание временного файла
+        temp_dir = Path(config.tmp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        temp_file = temp_dir / file.filename
+
+        # Сохранение файла
+        with open(temp_file, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+
+        # Индексация файла
+        #success = indexing_service.index_file(temp_file)
+        success = True
+
+        # Удаление временного файла
+        temp_file.unlink()
+
+        if success:
+            return {"message": f"Файл {file.filename} успешно проиндексирован"}
+        else:
+            raise HTTPException(status_code=400, detail="Ошибка при индексации файла")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
     uvicorn.run(
         "src.web.app:app",
         host=config.host,

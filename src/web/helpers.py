@@ -9,11 +9,15 @@ class FastAPIConfig:
     port: int
     debug: bool
 
+    tmp_dir: str
 
-def get_config(config_path: str = ".configs/fast_api.yaml") -> FastAPIConfig:
+def get_config(config_path: str = "configs/fast_api.yaml") -> FastAPIConfig:
     """Загрузка конфига."""
 
     with open(config_path, "r", encoding="utf-8") as f:
         config_data = yaml.safe_load(f)
 
-        return FastAPIConfig(**config_data["web"])
+        return FastAPIConfig(
+            **config_data["web"],
+            **config_data["paths"],
+        )
