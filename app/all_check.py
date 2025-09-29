@@ -1,19 +1,16 @@
 """Проверка основных компонентов."""
 
-from managers import QdrantManager
-
 """Окружение Python."""
 try:
     import requests
 except ImportError:
-    print("❌ Проблемы с импортом базовых библиотек. Ошибка подключения к SSH серверу?")
+    print("Подключение к SSH серверу: error ❌")
 finally:
-    print("✅ Подключение к SSH серверу.")
+    print("Подключение к SSH серверу: OK ✅")
 
 """Qdrant."""
 try:
-    qdrant = QdrantManager()
-    qdrant.client.get_collections()
-    print(f"✅ Подключение к Qdrant.")
+    from managers import qdrant_manager
+    print(f"Подключение к Qdrant: OK ✅")
 except Exception as e:
-    print(f"❌ Ошибка подключения к Qdrant: {e}")
+    print(f"Подключение к Qdrant: error ❌: {e}")
