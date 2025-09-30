@@ -8,11 +8,14 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.all_check import all_check
+from src.services import IndexingService
 from src.web.helpers import get_config
 
 
 config = get_config()
 
+# Инициализация сервисов
+indexing_service = IndexingService()
 
 # Инициализация FastAPI
 app = FastAPI(
@@ -72,8 +75,7 @@ async def upload_doc(file: UploadFile = File(...)):
             buffer.write(content)
 
         # Индексация файла
-        #success = indexing_service.index_file(temp_file)
-        success = True
+        success = indexing_service.index_file(temp_file)
 
         # Удаление временного файла
         temp_file.unlink()

@@ -1,26 +1,13 @@
 import yaml
 import logging
 
-from dataclasses import dataclass
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
     VectorParams,
 )
 
-
-@dataclass
-class BaseConfig:
-    """Базовая конфигурация"""
-    logging: dict
-
-
-@dataclass
-class QdrantConfig:
-    """Конфигурация Qdrant."""
-    host: str
-    port: int
-    collections: dict
+from src.dataclasses import BaseConfig, QdrantConfig
 
 
 class QdrantManager:
@@ -54,13 +41,13 @@ class QdrantManager:
         log_params = {
             "encoding": "utf-8",
             "level": getattr(logging, log_config["level"]),
-            "format": "[QM] %(asctime)s - %(levelname)s - %(message)s",
+            "format": "[Q.M.] %(asctime)s - %(levelname)s - %(message)s",
         }
 
         if log_config["log_in_file"]:
             log_params["filename"] = log_config["file"]
 
-        logging.basicConfig(**log_params) # todo переписать на loguru
+        logging.basicConfig(**log_params) # todo переписать на loguru и вынести в отдельный хелпер
 
         for name in ("httpx", "httpcore", "qdrant_client"):
             logging.getLogger(name).setLevel(logging.WARNING)
@@ -81,7 +68,7 @@ class QdrantManager:
             name = collection["name"]
 
             if name in current_collections:
-                self.logger.info(f"Collection '{name}' exists")
+                self.logger.info(f"Коллекция '{name}' уже существует")
             else:
                 try:
                     self.client.create_collection(
@@ -92,20 +79,20 @@ class QdrantManager:
                         ),
                     )
                 except Exception as e:
-                    self.logger.error(f"Error while creating collection: {e}", exc_info=True)
+                    self.logger.error(f"Ошибка при создании коллекции: {e}", exc_info=True)
                     raise
 
-                self.logger.info(f"Collection '{name}' created")
+                self.logger.info(f"Коллекция '{name}' создана")
 
     def delete_collection(self, name) -> None:
         """Удаление коллекции."""
 
         try:
             self.client.delete_collection(name)
-            self.logger.info(f"Collection '{name}' deleted")
+            self.logger.info(f"Коллекция '{name}' удалена")
 
         except Exception as e:
-            self.logger.error(f"Error while deleting collection: {e}", exc_info=True)
+            self.logger.error(f"Ошибка при удалении коллекции: {e}", exc_info=True)
             raise
 
     def close(self):
@@ -113,9 +100,9 @@ class QdrantManager:
 
         try:
             self.client.close()
-            self.logger.info("Qdrant connection closed")
+            self.logger.info("Соединение Qdrant закрыто")
         except Exception as e:
-            self.logger.error(f"Error while closing Qdrant connection: {e}, exc_info=True")
+            self.logger.error(f"Ошибка при закрытии соединения с Qdrant: {e}", exc_info=True)
             raise
 
 
