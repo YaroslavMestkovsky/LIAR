@@ -5,9 +5,9 @@ from typing import List
 
 import yaml
 
-
+from src.helpers import get_configs
 from src.managers import qdrant_manager, QdrantManager
-from src.dataclasses import IndexingServiceConfig, BaseConfig
+from src.project_dataclasses import IndexingServiceConfig, BaseConfig
 
 
 class IndexingService:
@@ -22,18 +22,16 @@ class IndexingService:
 
         self.qdrant_manager: QdrantManager = qdrant_manager
 
-
     def _load_config(self, config_path: str) -> None:
         """Загрузка конфига."""
 
-        with open(config_path, "r", encoding="utf-8") as f:
-            config_data = yaml.safe_load(f)
-
-            self.base_config = BaseConfig(**config_data["base"])
-            self.config = IndexingServiceConfig(
-                **config_data["processing"],
-                **config_data["defaults"],
-            )
+        self.base_config, self.config = get_configs(
+            config_path=config_path,
+            config_params={
+                BaseConfig: ["base"],
+                IndexingServiceConfig: ["processing", "defaults"],
+            },
+        )
 
     def _setup_logger(self) -> None:
         """Настройка логирования."""

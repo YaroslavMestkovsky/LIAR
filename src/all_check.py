@@ -22,6 +22,7 @@ def all_check():
     # Qdrant
     try:
         from src.managers import qdrant_manager
+        qdrant_manager.create_collections()
         checks["qdrant"] = f"Подключение к Qdrant: OK ✅"
     except Exception as e:
         checks["qdrant"] = f"Подключение к Qdrant: error ❌: {e}"

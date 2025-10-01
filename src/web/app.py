@@ -8,11 +8,18 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.all_check import all_check
+from src.helpers import get_configs
+from src.project_dataclasses import FastAPIConfig
 from src.services import IndexingService
-from src.web.helpers import get_config
 
 
-config = get_config()
+config, = get_configs(
+        config_path="/configs/fast_api.yaml",
+        config_params={
+            FastAPIConfig: ["web", "paths"],
+        },
+    )
+
 
 # Инициализация сервисов
 indexing_service = IndexingService()

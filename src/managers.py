@@ -7,7 +7,8 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from src.dataclasses import BaseConfig, QdrantConfig
+from src.helpers import get_configs
+from src.project_dataclasses import BaseConfig, QdrantConfig
 
 
 class QdrantManager:
@@ -23,16 +24,17 @@ class QdrantManager:
         self._setup_logger()
 
         self._create_client()
-        self._create_collections()
 
     def _load_config(self, config_path: str) -> None:
         """Загрузка конфига."""
 
-        with open(config_path, "r", encoding="utf-8") as f:
-            config_data = yaml.safe_load(f)
-
-            self.base_config = BaseConfig(**config_data["base"])
-            self.qdrant_config = QdrantConfig(**config_data["qdrant"])
+        self.base_config, self.qdrant_config = get_configs(
+            config_path=config_path,
+            config_params={
+                BaseConfig: ["base"],
+                QdrantConfig: ["qdrant"],
+            },
+        )
 
     def _setup_logger(self) -> None:
         """Настройка логирования."""
@@ -58,7 +60,7 @@ class QdrantManager:
         """Подключение к клиенту Qdrant."""
         self.client = QdrantClient(host=self.qdrant_config.host, port=self.qdrant_config.port)
 
-    def _create_collections(self) -> None:
+    def create_collections(self) -> None:
         """Проверка наличия необходимых коллекций и создание их, если их нет."""
 
         collections = self.client.get_collections()
@@ -68,7 +70,7 @@ class QdrantManager:
             name = collection["name"]
 
             if name in current_collections:
-                self.logger.info(f"Коллекция '{name}' уже существует")
+                self.logger.debug(f"Коллекция '{name}' уже существует")
             else:
                 try:
                     self.client.create_collection(
@@ -82,14 +84,14 @@ class QdrantManager:
                     self.logger.error(f"Ошибка при создании коллекции: {e}", exc_info=True)
                     raise
 
-                self.logger.info(f"Коллекция '{name}' создана")
+                self.logger.debug(f"Коллекция '{name}' создана")
 
     def delete_collection(self, name) -> None:
         """Удаление коллекции."""
 
         try:
             self.client.delete_collection(name)
-            self.logger.info(f"Коллекция '{name}' удалена")
+            self.logger.debug(f"Коллекция '{name}' удалена")
 
         except Exception as e:
             self.logger.error(f"Ошибка при удалении коллекции: {e}", exc_info=True)
@@ -100,7 +102,7 @@ class QdrantManager:
 
         try:
             self.client.close()
-            self.logger.info("Соединение Qdrant закрыто")
+            self.logger.debug("Соединение Qdrant закрыто")
         except Exception as e:
             self.logger.error(f"Ошибка при закрытии соединения с Qdrant: {e}", exc_info=True)
             raise

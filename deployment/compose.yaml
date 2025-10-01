@@ -8,13 +8,13 @@ services:
       dockerfile: ./Dockerfile
     container_name: python-ssh
     volumes:
-      - ../src:/src
+      - ../src:/opt/src
       - ../configs:/configs
       - ./start.sh:/start.sh
     privileged: true
     networks:
       local_net:
-        ipv4_address: 172.30.1.1
+        ipv4_address: 172.31.1.1
     ports:
       - "8000:8000"
       - "50000:22"
@@ -35,11 +35,11 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
     networks:
       local_net:
-        ipv4_address: 172.30.1.2
+        ipv4_address: 172.31.1.2
 
 networks:
   local_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.0.0/16
+        - subnet: 172.31.0.0/16

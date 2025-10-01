@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 
-from src.dataclasses import IndexingServiceConfig, BaseConfig
+from src.project_dataclasses import IndexingServiceConfig, BaseConfig
 
 
 class BaseProcessor(ABC):
@@ -116,7 +116,6 @@ class DocumentProcessor(BaseProcessor):
     def __init__(self, qdrant_client, config, base_config):
         super().__init__(qdrant_client, config, base_config)
 
-        # Инициализация модели эмбеддингов
         self._init_embedding_model()
 
         # Поддерживаемые форматы
@@ -366,3 +365,7 @@ class DocumentProcessor(BaseProcessor):
         except Exception as e:
             self.logger.error(f"Ошибка при извлечении текста из RTF {file_path}: {e}", exc_info=True)
             return ""
+
+    def _init_embedding_model(self):
+        """Инициализация модели эмбеддингов"""
+

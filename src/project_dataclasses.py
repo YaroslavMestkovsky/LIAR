@@ -24,3 +24,11 @@ class IndexingServiceConfig:
     top_k: int
 
     default_collection: str
+
+@dataclass
+class FastAPIConfig:
+    host: str
+    port: int
+    debug: bool
+
+    tmp_dir: str
