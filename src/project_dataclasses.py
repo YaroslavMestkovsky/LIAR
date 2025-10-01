@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
 
 
 @dataclass
@@ -32,3 +34,21 @@ class FastAPIConfig:
     debug: bool
 
     tmp_dir: str
+
+
+@dataclass
+class ModelsConfig:
+    embedding: str
+
+
+@dataclass
+class IndexingStats:
+    """Статистика индексации."""
+    total_files_processed: int
+    successful_files: int
+    failed_files: int
+    total_chunks_created: int
+    processing_time: float
+    start_time: datetime
+    end_time: Optional[datetime]
+

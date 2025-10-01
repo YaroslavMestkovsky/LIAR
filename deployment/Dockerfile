@@ -1,5 +1,5 @@
 # Контейнер с виртуальным окружением проекта.
-FROM python:3.13.0
+FROM python:3.11.0
 ARG USER_GID
 
 # установка необходимых зависимостей
@@ -14,8 +14,9 @@ RUN useradd -rm -d /home/python-root -s /bin/bash -g root -G sudo -u ${USER_GID}
 
 # установка зависимостей
 COPY requirements.txt /opt/requirements.txt
-RUN pip install --upgrade pip==25.2
-RUN pip install -r /opt/requirements.txt
+RUN pip install --upgrade pip==25.2 && \
+    pip install wheel && \
+    pip install -r /opt/requirements.txt
 
 # Отладка
 #CMD ["tail", "-f", "/dev/null"]

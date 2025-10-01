@@ -1,6 +1,7 @@
 import logging
 import re
 import uuid
+
 import PyPDF2
 import openpyxl
 
@@ -13,42 +14,56 @@ from bs4 import BeautifulSoup
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
+from sentence_transformers import SentenceTransformer
 
+from src.models import get_embedding_model
 from src.project_dataclasses import IndexingServiceConfig, BaseConfig
 
 
 class BaseProcessor(ABC):
     """Базовый процессор."""
 
-    def __init__(self, qdrant_client, config, base_config):
+    def __init__(self, chunk_size, qdrant_client, config, base_config):
         self.qdrant: QdrantClient = qdrant_client
         self.base_config: BaseConfig = base_config
         self.config: IndexingServiceConfig = config
+        self.logger: logging = None
 
         self.buffer: List[PointStruct] = []
         self.processed_count: int = 0
+        self.chunk_size: int = chunk_size
+        self.batch_size = self.config.batch_size
 
         self._setup_logger()
 
-    def _setup_logger(self) -> None:
-        """Настройка логирования."""
+    def finalize(self):
+        """Финализация обработки - отправка оставшихся данных."""
 
-        log_config = self.base_config.logging
-        log_params = {
-            "encoding": "utf-8",
-            "level": getattr(logging, log_config["level"]),
-            "format": "[B.P.] %(asctime)s - %(levelname)s - %(message)s",
+        if self.buffer:
+            self._flush_batch()
+
+        self.logger.debug(f"Обработка завершена. Всего обработано: {self.processed_count}")
+
+    @abstractmethod
+    def process_file(self, suffix: str, file_path: Path) -> bool:
+        """Обработка одного файла."""
+
+    @abstractmethod
+    def process_directory(self, directory_path: Path) -> int:
+        """Обработка директории."""
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Получение статистики обработки."""
+
+        return {
+            "processed_count": self.processed_count,
+            "buffer_size": len(self.buffer),
+            "batch_size": self.config.batch_size,
         }
 
-        if log_config["log_in_file"]:
-            log_params["filename"] = log_config["file"]
-
-        logging.basicConfig(**log_params) # todo переписать на loguru и вынести в отдельный хелпер
-
-        for name in ("httpx", "httpcore", "qdrant_client"):
-            logging.getLogger(name).setLevel(logging.WARNING)
-
-        self.logger = logging.getLogger(__name__)
+    @abstractmethod
+    def _setup_logger(self) -> None:
+        """Инициализация логгера."""
 
     def _flush_batch(self):
         """Отправка накопленного батча в Qdrant."""
@@ -59,7 +74,7 @@ class BaseProcessor(ABC):
                 points=self.buffer,
             )
             self.processed_count += len(self.buffer)
-            self.logger.info(f"Обработано {len(self.buffer)} элементов. Всего: {self.processed_count}")
+            self.logger.debug(f"Обработано {len(self.buffer)} элементов. Всего: {self.processed_count}")
 
         except Exception as e:
             self.logger.error(f"Ошибка при отправке батча: {e}", exc_info=True)
@@ -84,37 +99,20 @@ class BaseProcessor(ABC):
             payload=payload,
         )
 
-    def finalize(self):
-        """Финализация обработки - отправка оставшихся данных."""
+    def _add_to_buffer(self, point: PointStruct):
+        """Добавление точки в буфер."""
 
-        if self.buffer:
+        self.buffer.append(point)
+
+        if len(self.buffer) >= self.batch_size:
             self._flush_batch()
-
-        self.logger.info(f"Обработка завершена. Всего обработано: {self.processed_count}")
-
-    @abstractmethod
-    def process_file(self, file_path: Path) -> bool:
-        """Обработка одного файла."""
-
-    @abstractmethod
-    def process_directory(self, directory_path: Path) -> int:
-        """Обработка директории."""
-
-    def get_stats(self) -> Dict[str, Any]:
-        """Получение статистики обработки."""
-
-        return {
-            "processed_count": self.processed_count,
-            "buffer_size": len(self.buffer),
-            "batch_size": self.config.batch_size,
-        }
-
 
 class DocumentProcessor(BaseProcessor):
     """Процессор для обработки документов."""
 
-    def __init__(self, qdrant_client, config, base_config):
-        super().__init__(qdrant_client, config, base_config)
+    def __init__(self, chunk_size, qdrant_client, config, base_config):
+        super().__init__(chunk_size, qdrant_client, config, base_config)
+        self.embedding_model: SentenceTransformer
 
         self._init_embedding_model()
 
@@ -133,6 +131,27 @@ class DocumentProcessor(BaseProcessor):
             '.md': self._extract_md_text,
             '.rtf': self._extract_rtf_text,
         }
+
+    def _setup_logger(self) -> None:
+        """Настройка логирования."""
+
+        log_config = self.base_config.logging
+        log_params = {
+            "encoding": "utf-8",
+            "level": getattr(logging, log_config["level"]),
+            "format": "[D.P.] %(asctime)s - %(levelname)s - %(message)s",
+        }
+
+        if log_config["log_in_file"]:
+            log_params["filename"] = log_config["file"]
+
+        logging.basicConfig(**log_params) # todo переписать на loguru и вынести в отдельный хелпер
+
+        for name in ("httpx", "httpcore", "qdrant_client"):
+            logging.getLogger(name).setLevel(logging.WARNING)
+
+        self.logger = logging.getLogger(__name__)
+
 
     def _extract_pdf_text(self, file_path: Path) -> str:
         """Извлечение текста из PDF файла."""
@@ -156,7 +175,7 @@ class DocumentProcessor(BaseProcessor):
 
             text = "\n".join(text_parts)
 
-            self.logger.info(f"Извлечено {len(text)} символов из PDF: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из PDF: {file_path}")
             return text
 
         except Exception as e:
@@ -189,7 +208,7 @@ class DocumentProcessor(BaseProcessor):
 
             text = "\n".join(text_parts)
 
-            self.logger.info(f"Извлечено {len(text)} символов из DOCX: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из DOCX: {file_path}")
             return text
 
         except Exception as e:
@@ -223,7 +242,7 @@ class DocumentProcessor(BaseProcessor):
 
             text = "\n".join(text_parts)
 
-            self.logger.info(f"Извлечено {len(text)} символов из PPTX: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из PPTX: {file_path}")
             return text
 
         except Exception as e:
@@ -261,7 +280,7 @@ class DocumentProcessor(BaseProcessor):
 
             text = "\n".join(text_parts)
 
-            self.logger.info(f"Извлечено {len(text)} символов из XLSX: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из XLSX: {file_path}")
             return text
 
         except Exception as e:
@@ -294,7 +313,7 @@ class DocumentProcessor(BaseProcessor):
             chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
             text = ' '.join(chunk for chunk in chunks if chunk)
 
-            self.logger.info(f"Извлечено {len(text)} символов из HTML: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из HTML: {file_path}")
             return text
 
         except Exception as e:
@@ -313,7 +332,7 @@ class DocumentProcessor(BaseProcessor):
                     with open(file_path, 'r', encoding=encoding) as file:
                         text = file.read()
 
-                    self.logger.info(f"Извлечено {len(text)} символов из TXT: {file_path}")
+                    self.logger.debug(f"Извлечено {len(text)} символов из TXT: {file_path}")
                     return text
                 except UnicodeDecodeError:
                     continue
@@ -340,7 +359,7 @@ class DocumentProcessor(BaseProcessor):
             text = re.sub(r'\[(.*?)]\(.*?\)', r'\1', text)  # Ссылки
             text = re.sub(r'!\[.*?]\(.*?\)', '', text)  # Изображения
 
-            self.logger.info(f"Извлечено {len(text)} символов из MD: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из MD: {file_path}")
             return text
 
         except Exception as e:
@@ -359,7 +378,7 @@ class DocumentProcessor(BaseProcessor):
             text = re.sub(r'[{}]', '', text)
             text = re.sub(r'\s+', ' ', text)
 
-            self.logger.info(f"Извлечено {len(text)} символов из RTF: {file_path}")
+            self.logger.debug(f"Извлечено {len(text)} символов из RTF: {file_path}")
             return text
 
         except Exception as e:
@@ -368,4 +387,100 @@ class DocumentProcessor(BaseProcessor):
 
     def _init_embedding_model(self):
         """Инициализация модели эмбеддингов"""
+        try:
+            self.logger.debug("Инициализация общей модели эмбеддингов для поиска...")
+            self.embedding_model = get_embedding_model()
+            self.logger.debug("Модель эмбеддингов готова")
+        except Exception as e:
+            self.logger.error(f"Ошибка при загрузке модели эмбеддингов: {e}", exc_info=True)
+            raise
 
+    def process_file(self, suffix: str, file_path: Path):
+        """Обработка одного документа."""
+
+        try:
+            self.logger.debug(f"Обработка документа: {file_path}")
+
+            # Извлечение текста
+            extractor = self.document_formats[suffix]
+            text = extractor(file_path)
+
+            if not text.strip():
+                self.logger.warning(f"Не удалось извлечь текст из документа: {file_path}")
+                return False
+
+            # Разбиение на чанки
+            chunks = self._chunk_text(text)
+
+            if not chunks:
+                self.logger.warning(f"Не удалось разбить текст на чанки: {file_path}")
+                return False
+
+            # Обработка каждого чанка
+            for i, chunk in enumerate(chunks):
+                if not chunk.strip():
+                    continue
+
+                # Создание эмбеддинга
+                embedding = self._create_embedding(chunk)
+
+                # Создание точки для Qdrant
+                payload = {
+                    "file_path": str(file_path),
+                    "file_type": "document",
+                    "file_format": suffix,
+                    "text": chunk,
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "file_size": file_path.stat().st_size,
+                }
+
+                point = self._create_point(embedding, payload)
+                self._add_to_buffer(point)
+
+            self.logger.debug(f"Документ обработан: {file_path} ({len(chunks)} чанков)")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке документа {file_path}: {e}", exc_info=True)
+            return False
+
+    def process_directory(self, directory_path: Path) -> int:
+        pass
+
+    def _chunk_text(self, text: str) -> List[str]:
+        """Разбиение текста на чанки."""
+
+        words = text.split()
+        chunks = []
+
+        current_chunk = []
+        current_length = 0
+
+        for word in words:
+            if current_length + len(word) + 1 > self.chunk_size and current_chunk:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = [word]
+                current_length = len(word)
+            else:
+                current_chunk.append(word)
+                current_length += len(word) + 1
+
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+
+        return chunks
+
+    def _create_embedding(self, text: str) -> List[float]:
+        """Создание эмбеддинга для текста."""
+
+        try:
+            if not text.strip():
+                return [0.0] * 1024  # Пустой вектор
+
+            embedding = self.embedding_model.encode(text)
+            return embedding.tolist()
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при создании эмбеддинга: {e}", exc_info=True)
+            return [0.0] * 1024

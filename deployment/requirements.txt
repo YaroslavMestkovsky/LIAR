@@ -11,3 +11,5 @@ python-pptx
 openpyxl
 beautifulsoup4
 lxml
+
+sentence-transformers

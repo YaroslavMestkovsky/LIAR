@@ -1,15 +1,23 @@
 from functools import lru_cache
+from sentence_transformers import SentenceTransformer
+
+from src.helpers import get_configs
+from src.project_dataclasses import ModelsConfig
+
+
+config, = get_configs(
+    config_path="/configs/models.yaml",
+    config_params={
+        ModelsConfig: ["models"],
+    },
+)
 
 
 @lru_cache(maxsize=1)
 def get_embedding_model() -> SentenceTransformer:
     """Возвращает единственный экземпляр модели эмбеддингов (singleton)."""
 
-    config = get_config()
-    model_name = config.models.embedding
-    logger.info(f"Загрузка общей модели эмбеддингов: {model_name}")
+    model_name = config.embedding
     model = SentenceTransformer(model_name)
-    logger.info("Общая модель эмбеддингов загружена")
+
     return model
-
-
