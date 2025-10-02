@@ -27,7 +27,7 @@ class BaseProcessor(ABC):
         self.qdrant: QdrantClient = qdrant_client
         self.base_config: BaseConfig = base_config
         self.config: IndexingServiceConfig = config
-        self.logger: logging = None
+        self.logger: logging.Logger
 
         self.buffer: List[PointStruct] = []
         self.processed_count: int = 0
