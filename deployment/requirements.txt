@@ -12,4 +12,6 @@ openpyxl
 beautifulsoup4
 lxml
 
+tqdm
+
 sentence-transformers

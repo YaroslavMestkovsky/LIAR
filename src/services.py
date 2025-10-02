@@ -1,10 +1,10 @@
 import logging
+
+from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import List
-
-import yaml
 
 from src.helpers import get_configs
 from src.managers import qdrant_manager, QdrantManager
@@ -41,7 +41,6 @@ class IndexingService:
             start_time=datetime.now(),
             end_time=None,
         )
-
 
     def _load_config(self, config_path: str) -> None:
         """Загрузка конфига."""
@@ -123,21 +122,23 @@ class IndexingService:
                     for file_path in document_files
                 }
 
-                for future in as_completed(future_to_file):
-                    file_path = future_to_file[future]
+                with tqdm(total=len(document_files), desc="Индексация документов") as pbar:
+                    for future in as_completed(future_to_file):
+                        file_path = future_to_file[future]
 
-                    try:
-                        success = future.result()
+                        try:
+                            success = future.result()
 
-                        if success:
-                            self.stats.successful_files += 1
-                        else:
+                            if success:
+                                self.stats.successful_files += 1
+                            else:
+                                self.stats.failed_files += 1
+                        except Exception as e:
+                            self.logger.error(f"Ошибка при обработке документа {file_path}: {e}")
                             self.stats.failed_files += 1
-                    except Exception as e:
-                        self.logger.error(f"Ошибка при обработке документа {file_path}: {e}")
-                        self.stats.failed_files += 1
 
-                    self.stats.total_files_processed += 1
+                        self.stats.total_files_processed += 1
+                        pbar.update(1)
 
             # Финализация процессора
             self.document_processor.finalize()

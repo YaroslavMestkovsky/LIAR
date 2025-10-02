@@ -16,6 +16,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from sentence_transformers import SentenceTransformer
 
+from tqdm import tqdm
+
 from src.models import get_embedding_model
 from src.project_dataclasses import IndexingServiceConfig, BaseConfig
 
@@ -416,27 +418,29 @@ class DocumentProcessor(BaseProcessor):
                 self.logger.warning(f"Не удалось разбить текст на чанки: {file_path}")
                 return False
 
-            # Обработка каждого чанка
-            for i, chunk in enumerate(chunks):
-                if not chunk.strip():
-                    continue
+            with tqdm(total=len(chunks), desc="Создание эмбедингов") as pbar:
+                # Обработка каждого чанка
+                for i, chunk in enumerate(chunks):
+                    if not chunk.strip():
+                        continue
 
-                # Создание эмбеддинга
-                embedding = self._create_embedding(chunk)
+                    # Создание эмбеддинга
+                    embedding = self._create_embedding(chunk)
 
-                # Создание точки для Qdrant
-                payload = {
-                    "file_path": str(file_path),
-                    "file_type": "document",
-                    "file_format": suffix,
-                    "text": chunk,
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
-                    "file_size": file_path.stat().st_size,
-                }
+                    # Создание точки для Qdrant
+                    payload = {
+                        "file_path": str(file_path),
+                        "file_type": "document",
+                        "file_format": suffix,
+                        "text": chunk,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "file_size": file_path.stat().st_size,
+                    }
 
-                point = self._create_point(embedding, payload)
-                self._add_to_buffer(point)
+                    point = self._create_point(embedding, payload)
+                    self._add_to_buffer(point)
+                    pbar.update(1)
 
             self.logger.debug(f"Документ обработан: {file_path} ({len(chunks)} чанков)")
             return True
@@ -478,7 +482,7 @@ class DocumentProcessor(BaseProcessor):
             if not text.strip():
                 return [0.0] * 1024  # Пустой вектор
 
-            embedding = self.embedding_model.encode(text)
+            embedding = self.embedding_model.encode(text, show_progress_bar=False)
             return embedding.tolist()
 
         except Exception as e:
