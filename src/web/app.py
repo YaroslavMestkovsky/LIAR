@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.all_check import all_check
 from src.helpers import get_configs
 from src.project_dataclasses import FastAPIConfig
-from src.services import IndexingService
-
+from src.services import IndexingService, QueryService
+from src.web.enums import FileType
+from src.web.models import SearchResponseModel, SearchRequest
 
 config, = get_configs(
         config_path="/configs/fast_api.yaml",
@@ -23,6 +24,8 @@ config, = get_configs(
 
 # Инициализация сервисов
 indexing_service = IndexingService()
+query_service = QueryService()
+
 
 # Инициализация FastAPI
 app = FastAPI(
@@ -93,6 +96,48 @@ async def upload_doc(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Ошибка при индексации файла")
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/search", response_model=SearchResponseModel)
+async def search_api(request: SearchRequest):
+    """API для поиска."""
+    try:
+        # Преобразование типов файлов
+        file_types = None
+
+        if request.file_types:
+            file_types = [FileType(ft) for ft in request.file_types if ft in [t.value for t in FileType]]
+
+        # Выполнение поиска
+        response = query_service.search(
+            query=request.query,
+            file_types=file_types,
+            limit=request.limit,
+            score_threshold=request.score_threshold
+        )
+
+        # Преобразование результатов
+        results = []
+        for result in response.results:
+            results.append({
+                "id": result.id,
+                "file_path": result.file_path,
+                "file_type": result.file_type.value,
+                "text": result.text,
+                "score": result.score,
+                "metadata": result.metadata
+            })
+
+        return SearchResponseModel(
+            query=response.query,
+            results=results,
+            total_found=response.total_found,
+            processing_time=response.processing_time
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка при поиске: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

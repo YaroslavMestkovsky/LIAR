@@ -1,14 +1,19 @@
-import yaml
+from typing import List, Optional, Dict, Any
+
 import logging
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
     VectorParams,
+    FieldCondition,
+    MatchValue,
+    Filter,
 )
 
 from src.helpers import get_configs
-from src.project_dataclasses import BaseConfig, QdrantConfig
+from src.project_dataclasses import BaseConfig, QdrantConfig, SearchResult
+from src.web.enums import FileType
 
 
 class QdrantManager:
@@ -32,7 +37,7 @@ class QdrantManager:
             config_path=config_path,
             config_params={
                 BaseConfig: ["base"],
-                QdrantConfig: ["qdrant"],
+                QdrantConfig: ["qdrant", "defaults"],
             },
         )
 
@@ -59,6 +64,81 @@ class QdrantManager:
     def _create_client(self) -> None:
         """Подключение к клиенту Qdrant."""
         self.client = QdrantClient(host=self.qdrant_config.host, port=self.qdrant_config.port)
+
+    def search_similar(
+        self,
+        query_embedding: List[float],
+        limit: int = 10,
+        score_threshold: float = 0.7,
+        file_types: Optional[List[FileType]] = None,
+        metadata_filter: Optional[Dict[str, Any]] = None
+    ) -> List[SearchResult]:
+        """Поиск похожих документов.
+
+        Args:
+            query_embedding: Вектор запроса
+            limit: Максимальное количество результатов
+            score_threshold: Порог схожести
+            file_types: Фильтр по типам файлов
+            metadata_filter: Фильтр по метаданным
+
+        Returns:
+            Список результатов поиска
+        """
+
+        try:
+            # Построение фильтра
+            filter_conditions = []
+
+            if file_types:
+                file_type_values = [ft.value for ft in file_types]
+                filter_conditions.append(
+                    FieldCondition(
+                        key="file_type",
+                        match=MatchValue(value=file_type_values),
+                    ),
+                )
+
+            if metadata_filter:
+                for key, value in metadata_filter.items():
+                    filter_conditions.append(
+                        FieldCondition(
+                            key=key,
+                            match=MatchValue(value=value),
+                        ),
+                    )
+
+            # Выполнение поиска
+            search_filter = Filter(must=filter_conditions) if filter_conditions else None
+
+            search_results = self.client.search(
+                collection_name=self.qdrant_config.default_collection,
+                query_vector=query_embedding,
+                limit=limit,
+                score_threshold=score_threshold,
+                query_filter=search_filter,
+            )
+
+            # Преобразование результатов
+            results = []
+
+            for result in search_results:
+                if result.score >= score_threshold:
+                    search_result = SearchResult(
+                        id=result.id,
+                        file_path=result.payload.get("file_path", ""),
+                        file_type=FileType(result.payload.get("file_type", "document")),
+                        text=result.payload.get("text", ""),
+                        score=result.score,
+                        metadata=result.payload,
+                    )
+                    results.append(search_result)
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при поиске: {e}", exc_info=True)
+            return []
 
     def create_collections(self) -> None:
         """Проверка наличия необходимых коллекций и создание их, если их нет."""

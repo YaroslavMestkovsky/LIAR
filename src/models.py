@@ -21,3 +21,17 @@ def get_embedding_model() -> SentenceTransformer:
     model = SentenceTransformer(model_name)
 
     return model
+
+
+def init_embedding_model(logger):
+    """Инициализация модели эмбеддингов"""
+
+    try:
+        logger.debug("Инициализация общей модели эмбеддингов для поиска...")
+        embedding_model = get_embedding_model()
+        logger.debug("Модель эмбеддингов готова")
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке модели эмбеддингов: {e}", exc_info=True)
+        raise
+
+    return embedding_model

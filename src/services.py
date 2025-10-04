@@ -6,10 +6,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from src.helpers import get_configs
-from src.managers import qdrant_manager, QdrantManager
+from src.models import get_configs, init_embedding_model
+from src.managers import qdrant_manager as qm, QdrantManager
 from src.processors import DocumentProcessor
-from src.project_dataclasses import IndexingServiceConfig, BaseConfig, IndexingStats
+from src.project_dataclasses import IndexingServiceConfig, BaseConfig, IndexingStats, SearchResponse, QuerierConfig
 
 
 class IndexingService:
@@ -23,7 +23,7 @@ class IndexingService:
         self._setup_logger()
 
         self.num_workers = self.config.num_workers
-        self.qdrant_manager: QdrantManager = qdrant_manager
+        self.qdrant_manager: QdrantManager = qm
         self.document_processor: DocumentProcessor = DocumentProcessor(
             self.config.chunk_size,
             self.qdrant_manager.client,
@@ -180,3 +180,102 @@ class IndexingService:
         self.stats.processing_time = (self.stats.end_time - start_time).total_seconds()
 
         return self.stats
+
+
+class QueryService:
+    """Сервис поиска и запросов."""
+
+    def __init__(self, qdrant_manager: QdrantManager = qm):
+        self.base_config: BaseConfig
+        self.querier_config: QuerierConfig
+
+        self._load_config("/configs/querier.yaml")
+        self._setup_logger()
+        self.qdrant_manager = qdrant_manager
+
+        self.embedding_model = init_embedding_model(self.logger)
+
+    def search(self, query: str, **kwargs) -> SearchResponse:
+        """Поиск по базе знаний."""
+
+        try:
+            # Создание эмбеддинга запроса
+            query_embedding = self._create_query_embedding(query)
+
+            # Параметры поиска
+            limit = kwargs.get('limit', self.querier_config.processing["top_k"])
+            score_threshold = kwargs.get('score_threshold', 0.0)
+            file_types = kwargs.get('file_types')
+            metadata_filter = kwargs.get('metadata_filter')
+
+            # Выполнение поиска
+            results = self.qdrant_manager.search_similar(
+                query_embedding=query_embedding,
+                limit=limit,
+                score_threshold=score_threshold,
+                file_types=file_types,
+                metadata_filter=metadata_filter,
+            )
+            return SearchResponse(
+                query=query,
+                results=results,
+                total_found=len(results),
+                processing_time=0.0,  # TODO: добавить измерение времени
+                query_embedding=query_embedding,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при поиске: {e}", exc_info=True)
+            return SearchResponse(
+                query=query,
+                results=[],
+                total_found=0,
+                processing_time=0.0,
+                query_embedding=[],
+            )
+
+    def _create_query_embedding(self, query: str) -> List[float]:
+        """Создание эмбеддинга для запроса."""
+
+        try:
+            if not query.strip():
+                return [0.0] * 1024  # Пустой вектор
+
+            embedding = self.embedding_model.encode(query)
+            return embedding.tolist()
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при создании эмбеддинга запроса: {e}", exc_info=True)
+            return [0.0] * 1024
+
+    def _load_config(self, config_path: str) -> None:
+        """Загрузка конфига."""
+
+        self.base_config, self.querier_config, = get_configs(
+            config_path=config_path,
+            config_params={
+                BaseConfig: ["base"],
+                QuerierConfig: ["querier"],
+            },
+        )
+
+    def _setup_logger(self):
+        """Настройка логирования."""
+
+        log_config = self.base_config.logging
+        log_params = {
+            "encoding": "utf-8",
+            "level": getattr(logging, log_config["level"]),
+            "format": "[D.P.] %(asctime)s - %(levelname)s - %(message)s",
+        }
+
+        if log_config["log_in_file"]:
+            log_params["filename"] = log_config["file"]
+
+        logging.basicConfig(**log_params) # todo переписать на loguru и вынести в отдельный хелпер
+
+        for name in ("httpx", "httpcore", "qdrant_client"):
+            logging.getLogger(name).setLevel(logging.WARNING)
+
+        self.logger = logging.getLogger(__name__)
+

@@ -18,7 +18,7 @@ from sentence_transformers import SentenceTransformer
 
 from tqdm import tqdm
 
-from src.models import get_embedding_model
+from src.models import init_embedding_model
 from src.project_dataclasses import IndexingServiceConfig, BaseConfig
 
 
@@ -109,14 +109,13 @@ class BaseProcessor(ABC):
         if len(self.buffer) >= self.batch_size:
             self._flush_batch()
 
+
 class DocumentProcessor(BaseProcessor):
     """Процессор для обработки документов."""
 
     def __init__(self, chunk_size, qdrant_client, config, base_config):
         super().__init__(chunk_size, qdrant_client, config, base_config)
-        self.embedding_model: SentenceTransformer
-
-        self._init_embedding_model()
+        self.embedding_model: SentenceTransformer = init_embedding_model(self.logger)
 
         # Поддерживаемые форматы
         self.document_formats = {
@@ -153,7 +152,6 @@ class DocumentProcessor(BaseProcessor):
             logging.getLogger(name).setLevel(logging.WARNING)
 
         self.logger = logging.getLogger(__name__)
-
 
     def _extract_pdf_text(self, file_path: Path) -> str:
         """Извлечение текста из PDF файла."""
@@ -386,16 +384,6 @@ class DocumentProcessor(BaseProcessor):
         except Exception as e:
             self.logger.error(f"Ошибка при извлечении текста из RTF {file_path}: {e}", exc_info=True)
             return ""
-
-    def _init_embedding_model(self):
-        """Инициализация модели эмбеддингов"""
-        try:
-            self.logger.debug("Инициализация общей модели эмбеддингов для поиска...")
-            self.embedding_model = get_embedding_model()
-            self.logger.debug("Модель эмбеддингов готова")
-        except Exception as e:
-            self.logger.error(f"Ошибка при загрузке модели эмбеддингов: {e}", exc_info=True)
-            raise
 
     def process_file(self, suffix: str, file_path: Path):
         """Обработка одного документа."""
