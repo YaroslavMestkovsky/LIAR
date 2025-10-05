@@ -430,6 +430,7 @@ class DocumentProcessor(BaseProcessor):
                     self._add_to_buffer(point)
                     pbar.update(1)
 
+            self.finalize()
             self.logger.debug(f"Документ обработан: {file_path} ({len(chunks)} чанков)")
             return True
 
