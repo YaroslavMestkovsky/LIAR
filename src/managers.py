@@ -92,11 +92,13 @@ class QdrantManager:
 
             if file_types:
                 file_type_values = [ft.value for ft in file_types]
-                filter_conditions.append(
-                    FieldCondition(
-                        key="file_type",
-                        match=MatchValue(value=file_type_values),
-                    ),
+
+                for file_type_value in file_type_values:
+                    filter_conditions.append(
+                        FieldCondition(
+                            key="file_type",
+                            match=MatchValue(value=file_type_value),
+                        ),
                 )
 
             if metadata_filter:
@@ -109,7 +111,7 @@ class QdrantManager:
                     )
 
             # Выполнение поиска
-            search_filter = Filter(must=filter_conditions) if filter_conditions else None
+            search_filter = Filter(should=filter_conditions) if filter_conditions else None
 
             search_results = self.client.search(
                 collection_name=self.qdrant_config.default_collection,
