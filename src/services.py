@@ -1,15 +1,32 @@
 import logging
 
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import List
-
-from src.models import get_configs, init_embedding_model
-from src.managers import qdrant_manager as qm, QdrantManager
+from tqdm import tqdm
 from src.processors import DocumentProcessor
-from src.project_dataclasses import IndexingServiceConfig, BaseConfig, IndexingStats, SearchResponse, QuerierConfig
+from sentence_transformers import SentenceTransformer
+
+from concurrent.futures import (
+    as_completed,
+    ThreadPoolExecutor,
+)
+
+from src.models import (
+    get_configs,
+    init_embedding_model,
+)
+from src.managers import (
+    qdrant_manager as qm,
+    QdrantManager,
+)
+from src.project_dataclasses import (
+    IndexingServiceConfig,
+    BaseConfig,
+    IndexingStats,
+    SearchResponse,
+    QuerierConfig,
+)
 
 
 class IndexingService:
@@ -193,7 +210,7 @@ class QueryService:
         self._setup_logger()
         self.qdrant_manager = qdrant_manager
 
-        self.embedding_model = init_embedding_model(self.logger)
+        self.embedding_model: SentenceTransformer = init_embedding_model(self.logger)
 
     def search(self, query: str, **kwargs) -> SearchResponse:
         """Поиск по базе знаний."""
