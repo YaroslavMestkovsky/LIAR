@@ -211,5 +211,11 @@ class QdrantManager:
             raise
 
 
+class LLAManager:
+    """Менеджер LLA-модели."""
+
+    PROMPT = """
+    """
+
 # Глобальный экземпляр менеджера Qdrant
 qdrant_manager = QdrantManager()

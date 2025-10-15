@@ -36,6 +36,25 @@ services:
       local_net:
         ipv4_address: 172.31.1.2
 
+  ollama:
+      image: ollama/ollama
+      ports:
+        - "11434:11434"
+      volumes:
+        - ../ollama_data:/root/.ollama
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu]
+      environment:
+        - OLLAMA_HOST=0.0.0.0:11434
+      networks:
+        local_net:
+          ipv4_address: 172.31.1.3
+
 networks:
   local_net:
     driver: bridge
