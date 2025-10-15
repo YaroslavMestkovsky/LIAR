@@ -126,13 +126,34 @@ class QdrantManager:
 
             for result in search_results:
                 if result.score >= score_threshold:
+                    # Собираем +- 10 результатов от полученного.
+                    chunk_index = result.payload.get('chunk_index')
+                    chunk_filter = Filter(
+                        must=[
+                            {
+                                "key": "chunk_index",  # путь к полю в payload
+                                "range": {
+                                    "gte": chunk_index - self.qdrant_config.shift,
+                                    "lte": chunk_index + self.qdrant_config.shift,
+                                },
+                            },
+                        ],
+                    )
+
+                    points, _ = self.client.scroll(
+                        collection_name=self.qdrant_config.default_collection,
+                        scroll_filter=chunk_filter,
+                        limit=100,
+                        with_payload=True,
+                    )
+
                     search_result = SearchResult(
-                        id=result.id,
-                        file_path=result.payload.get("file_path", ""),
-                        file_type=FileType(result.payload.get("file_type", "document")),
-                        text=result.payload.get("text", ""),
+                        ids=[point.id for point in points],
+                        chunks=sorted([point.payload.get("chunk_index") for point in points]),
+                        file_paths=list(set((point.payload.get("file_path", "") for point in points))),
+                        file_types=list(set((FileType(point.payload.get("file_type", "document")) for point in points))),
+                        texts=[point.payload.get("text", "") for point in points],
                         score=result.score,
-                        metadata=result.payload,
                     )
                     results.append(search_result)
 

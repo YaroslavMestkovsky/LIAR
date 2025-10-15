@@ -14,6 +14,7 @@ from src.services import IndexingService, QueryService
 from src.web.enums import FileType
 from src.web.models import SearchResponseModel, SearchRequest
 
+
 config, = get_configs(
         config_path="/configs/fast_api.yaml",
         config_params={
@@ -114,30 +115,29 @@ async def search_api(request: SearchRequest):
             query=request.query,
             file_types=file_types,
             limit=request.limit,
-            score_threshold=request.score_threshold
+            score_threshold=request.score_threshold,
         )
 
         # Преобразование результатов
         results = []
         for result in response.results:
             results.append({
-                "id": result.id,
-                "file_path": result.file_path,
-                "file_type": result.file_type.value,
-                "text": result.text,
+                "ids": result.ids,
+                "chunks": result.chunks,
+                "file_paths": result.file_paths,
+                "file_types": [file_type.value for file_type in result.file_types],
+                "texts": result.texts,
                 "score": result.score,
-                "metadata": result.metadata
             })
 
         return SearchResponseModel(
             query=response.query,
             results=results,
             total_found=response.total_found,
-            processing_time=response.processing_time
+            processing_time=response.processing_time,
         )
 
     except Exception as e:
-        logger.error(f"Ошибка при поиске: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

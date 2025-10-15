@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from src.web.enums import FileType
 
@@ -18,6 +18,7 @@ class QdrantConfig:
     port: int
     collections: dict
     default_collection: str
+    shift: int
 
 @dataclass
 class IndexingServiceConfig:
@@ -63,12 +64,12 @@ class IndexingStats:
 @dataclass
 class SearchResult:
     """Результат поиска."""
-    id: str
-    file_path: str
-    file_type: FileType
-    text: str
+    ids: list
+    chunks: list
+    file_paths: list
+    file_types: List[FileType]
+    texts: list
     score: float
-    metadata: Dict[str, Any]
 
 
 @dataclass
