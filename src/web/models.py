@@ -17,6 +17,13 @@ class SearchResponseModel(BaseModel):
     processing_time: float
 
 
+class AskRequest(BaseModel):
+    ...
+
+class AskResponse(BaseModel):
+    ...
+
+
 class IndexingRequest(BaseModel):
     path: str
     file_type: str  # "documents" or "media"

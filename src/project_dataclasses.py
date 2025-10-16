@@ -68,7 +68,7 @@ class SearchResult:
     chunks: list
     file_paths: list
     file_types: List[FileType]
-    texts: list
+    texts: str
     score: float
 
 

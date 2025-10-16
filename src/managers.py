@@ -152,7 +152,7 @@ class QdrantManager:
                         chunks=sorted([point.payload.get("chunk_index") for point in points]),
                         file_paths=list(set((point.payload.get("file_path", "") for point in points))),
                         file_types=list(set((FileType(point.payload.get("file_type", "document")) for point in points))),
-                        texts=[point.payload.get("text", "") for point in points],
+                        texts=', '.join([point.payload.get("text", "") for point in points]),
                         score=result.score,
                     )
                     results.append(search_result)

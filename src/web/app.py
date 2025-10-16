@@ -12,8 +12,7 @@ from src.helpers import get_configs
 from src.project_dataclasses import FastAPIConfig
 from src.services import IndexingService, QueryService
 from src.web.enums import FileType
-from src.web.models import SearchResponseModel, SearchRequest
-
+from src.web.models import SearchResponseModel, SearchRequest, AskResponse, AskRequest
 
 config, = get_configs(
         config_path="/configs/fast_api.yaml",
@@ -139,6 +138,13 @@ async def search_api(request: SearchRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/ask", response_model=AskResponse)
+async def ask(request: AskRequest):
+    """API для получение ответа из LLM."""
+
+
 
 
 if __name__ == "__main__":
