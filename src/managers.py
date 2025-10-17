@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 
 import logging
 
+import requests
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -215,7 +216,37 @@ class LLAManager:
     """Менеджер LLA-модели."""
 
     PROMPT = """
+    Ты — помощник по документации. Отвечай только на основе контекста.
+    Если ответа нет, скажи: 'Я не знаю'.
+    
+    Контекст:
+    {context}
+    
+    Вопрос: {query}
+    Ответ:
     """
+
+    def ask(self, context, query):
+        prompt = self.PROMPT.format(context=context, query=query)
+
+        return self.query_ollama(prompt)
+
+    @staticmethod
+    def query_ollama(prompt, model="llama3"):
+        url = "http://172.31.1.3:11434/api/generate"
+
+        data = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,  # отключаем потоковую передачу
+        }
+
+        response = requests.post(url, json=data)
+
+        if response.status_code == 200:
+            return response.json()["response"]
+        else:
+            raise Exception(f"Ошибка Ollama: {response.status_code}, {response.text}")
 
 # Глобальный экземпляр менеджера Qdrant
 qdrant_manager = QdrantManager()

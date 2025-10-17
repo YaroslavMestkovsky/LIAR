@@ -147,6 +147,7 @@ async def ask(request: AskRequest):
 
 
 
+
 if __name__ == "__main__":
     uvicorn.run(
         "src.web.app:app",
