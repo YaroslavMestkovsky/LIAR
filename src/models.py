@@ -6,7 +6,7 @@ from src.project_dataclasses import ModelsConfig
 
 
 config, = get_configs(
-    config_path="/configs/models.yaml",
+    config_path="/configs/models."yaml,
     config_params={
         ModelsConfig: ["models"],
     },
